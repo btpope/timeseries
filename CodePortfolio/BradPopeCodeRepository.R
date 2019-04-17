@@ -1,5 +1,21 @@
-### Time Series code
-# Time Series examples from Introduction to Time Series Analysis by David S. Matteson
+# Outline:
+# Time Series
+#     Importing / processing time series data
+#     Exploratory visualization time series
+#     Time series analysis   
+# xts
+# zoo
+
+# Citation summary:
+# Time Series examples from Data Camp Introduction to Time Series Analysis by David S. Matteson (noted below as well)
+# xts from Data Camp Manipulating Time Series Data in R with xts & zoo by Jeffrey Ryan (noted below as well)
+# ARIMA from Data Camp ARIMA Modeling with R by David Stoffer(noted below as well)
+
+#### Time Series code ####
+
+### 1) Importing/processing time series data ###
+
+# Time Series examples from Data Camp Introduction to Time Series Analysis by David S. Matteson
 
 ## Creating Time Series
 # data_vector is comprised of 10 6 11 8 10 3 6 9
@@ -7,6 +23,9 @@ time_series = ts(data_vector)
 
 # Convert data_vector to a ts object with start = 2004 and frequency = 4
 time_series <- ts(data_vector, start=2004, frequency=4) 
+
+
+### 2) Exploratory visualization of time series  ###
 
 ## Plotting and Summarize Time Series 
 
@@ -20,13 +39,26 @@ boxplot(AirPassengers ~ cycle(AirPassengers))
 #Reduce seasonal effect by aggregating data to the annual level. 
 plot(aggregate(AirPassengers), ylab = "Aggregated annually")
 
-
 # View the start and end dates of AirPassengers
 start(AirPassengers); end(AirPassengers)
 
 # Use time(), deltat(), frequency(), and cycle() with AirPassengers 
 time(AirPassengers); deltat(AirPassengers); frequency(AirPassengers); cycle(AirPassengers)
 summary(AirPassengers)
+
+# Seasonal plot by frequency / month /  year /etc
+library(fpp2)
+ggseasonplot(a10)
+
+#polar coordinate season plot with a circular time axis
+ggseasonplot(a10, polar = TRUE)
+
+# Plot the data with facetting
+autoplot(myts, facets = 4)
+
+# Find the outlier in the a series
+outlier <- which.max(tsdata)
+
 
 ## Imputing Values
 
@@ -36,7 +68,7 @@ mean(AirPassengers, na.rm=TRUE)
 # Impute mean values to NA in AirPassengers
 AirPassengers[85:96] <- mean(AirPassengers, na.rm = TRUE)
 
-
+### 3) Time series analysis ###
 
 ## diff()  function calculates the differences between all consecutive values of a vector
 
@@ -83,7 +115,6 @@ ts.plot(rw_drift)
 # Or use cumsum() to convert your WN data to RW
 random_walk <- cumsum(white_noise)
 
-
 # Calculate the first difference series
 rw_drift_diff <- diff(rw_drift)
 ts.plot(rw_drift_diff)
@@ -91,13 +122,11 @@ ts.plot(rw_drift_diff)
 # Plot White Noise, Random Walk
 plot.ts(cbind(white_noise, random_walk))
 
-
 ## Log Diff
 
 # Convert prices to log returns
 logreturns <- diff(log(eu_stocks))
 plot(logreturns)
-
 
 ## Covariance and Correlation
 # Use cov() to form the variance-covariance matrix
@@ -115,8 +144,8 @@ acf(x, lag.max = 10, plot = FALSE)
 # View the ACF of x
 acf(x)
 
-
 ## Autoregressive (AR) model 
+# ARIMA from Data Camp ARIMA Modeling with R by David Stoffer
 # Widely used time series model that shares the very familiar interpretation of a simple linear regression, but here each observation is regressed on the previous observation. The AR model also includes the white noise (WN) and random walk (RW) models examined in earlier chapters as special cases.
 
 # Simulate an AR model with 0.5 slope
@@ -170,6 +199,26 @@ points(AR_forecast, type = "l", col = 2)
 points(AR_forecast - 2*AR_forecast_se, type = "l", col = 2, lty = 2)
 points(AR_forecast + 2*AR_forecast_se, type = "l", col = 2, lty = 2)
 
+## Other pipe test and control
+
+# the pipe function (%>%) When there are many nested functions, pipe functions make the code much easier to read. To be consistent, always follow a function with parentheses to differentiate it from other objects, even if it has no arguments. An example: 
+#> function(foo)       # These two
+#> foo %>% function()  # are the same!
+
+#Forecasting train and test!
+
+# Create the training data as train
+train <- subset(gold, end = 1000)
+
+# Compute naive forecasts and save to naive_fc
+naive_fc <- naive(train, h = 108)
+
+# Compute mean forecasts and save to mean_fc
+mean_fc <- meanf(train, h = 108)
+
+# Use accuracy() to compute RMSE statistics
+accuracy(naive_fc, gold)
+
 
 ## Examples:
 
@@ -190,8 +239,8 @@ inflation = as.ts(Mishkin[,1])
 ts.plot(inflation) ; acf(inflation)
 
 
-### xts
-## From Manipulating Time Series Data in R with xts & zoo by Jeffrey Ryan
+#### xts ####
+## From Data Camp Manipulating Time Series Data in R with xts & zoo by Jeffrey Ryan
 
 # load the xts library
 library(xts)
@@ -224,7 +273,6 @@ dates <- as.Date("2016-01-01") + 0:4
 
 # Create ts_a by creating 5 rows and referencing the dates.
 ts_a <- xts(x = 1:5, order.by = dates)
-
 
 ## Converting to xts
 
@@ -265,7 +313,6 @@ sun_xts = as.xts(sun)
 head(sun_xts)
 
 
-
 ## Decomposing Time Series
 
 #Create a chocolate time series
@@ -273,8 +320,6 @@ Choc <- ts(week5cbe[, 1], start = 1958, freq = 12)
 
 Chocdecom2 <- decompose(Choc, "additive")
 plot(Chocdecom2)
-
-
 
 ## Extracting data from xts
 # Extract the core data of hayek
@@ -290,15 +335,14 @@ hayek_index=index(hayek)
 class(hayek_index)
 
 
-#### Zoo Library
+
+#### Zoo Library  ####
 
 library(zoo)
 wZ <- zoo(inData)
 
-
 #The two columns (Symbol and Series) are characters and need to be removed:
 Z <- read.zoo(inData[3:10],format = "%d-%b-%y",index.column = "Date")
-
 
 ## Aggregate by quarter and year
 # Get the mean of Z$DeliveryVolume to Z$TotalVolume per quarter, by using Aggregate function.
