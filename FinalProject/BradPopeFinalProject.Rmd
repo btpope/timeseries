@@ -1,0 +1,105 @@
+---
+title: "Item Profiling and Forecasting - Time Series Class"
+author: "Brad Pope"
+date: "April, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Summary of the Dataset :
+
+This is the sales history for a single UPC for a non-perishable product sold in a single retail location.
+
+Here are the start, end, frequency and cycle information:
+
+```{r Import, include=FALSE, echo=FALSE}
+
+library(readr)
+library(xts)
+library(astsa)
+library(readr)
+
+cleanitem <- read_delim("C:/1 Brad/Dropbox/Data Science/Independent Study/cleanitem.txt", 
+                        "\t", escape_double = FALSE, col_types = cols(Date = col_date(format = "%m/%d/%Y")), 
+                        trim_ws = TRUE)
+
+include=TRUE
+#Converting the data to an xts
+item <- xts(cleanitem$`Total volume`, order.by=as.Date(cleanitem$`Date`, "%m/%d/%Y"))
+
+#Converting the data to a time series
+c.item <- ts(cleanitem, frequency=365, start=c(2016, 268)) 
+
+```
+
+```{r Description, echo=FALSE}
+# View the start and end dates of the dataset
+#start(c.item)
+#end(c.item)
+#frequency(c.item)
+cycle(c.item) # includes start, end and cycle
+
+```
+## Exploration
+
+Exploring the dataset (plotting data: scatterplot, histogram):
+```{r FreqDuration, echo=FALSE}
+plot(item)
+hist(item)
+
+```
+
+## Decomposition
+Decomposition stage (plotting)
+
+
+```{r, Decompose, echo=FALSE}
+c.itemdecomp <- decompose(c.item, "additive")
+plot(c.itemdecomp)
+```
+
+## Regression
+building model, evaluation and interpretation
+
+```{r, Regression, echo=FALSE}
+
+#removed the trend
+d_item=diff(item)
+acf2(d_item)
+plot(d_item)
+
+
+#removing the cyclical nature of the data
+dd_item=diff(d_item,lag=7)
+plot(dd_item)
+
+#Plot the ACF and PACF
+acf2(dd_item, max.lag=60)
+
+AR = arima(item, order = c(1,1,1)) # I tried this with the seasonal 7 digit to no avail
+print(AR)
+
+```
+## Seasonal ARIMA
+Building ARMA model (SARIMA) with a forecast
+
+```{r, SARIMA model, echo=FALSE}
+#Model a Seasonal ARIMA
+x=sarima(item,1,1,1,0,1,1,7)
+x
+
+#Forecast the seasonal ARIMA
+sarima.for(item,35,1,1,1,0,1,1,7)
+
+```
+## Model Diagnostics
+
+ar1, ma1 and smal all have significant values
+```{r, Model Diagnostics, echo = FALSE}
+
+x$ttable
+
+```
