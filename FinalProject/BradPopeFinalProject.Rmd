@@ -5,16 +5,10 @@ date: "April, 2019"
 output: html_document
 ---
 
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
-
-## Summary of the Dataset :
-
-This is the sales history for a single UPC for a non-perishable product sold in a single retail location.
-
-Here are the start, end, frequency and cycle information:
-
 ```{r Import, include=FALSE, echo=FALSE}
 
 library(readr)
@@ -22,7 +16,7 @@ library(xts)
 library(astsa)
 library(readr)
 
-cleanitem <- read_delim("C:/1 Brad/Dropbox/Data Science/Independent Study/cleanitem.txt", 
+cleanitem <- read_delim("C:/1 Brad/Dropbox/Data Science/Time Series Analysis/cleanitem.txt", 
                         "\t", escape_double = FALSE, col_types = cols(Date = col_date(format = "%m/%d/%Y")), 
                         trim_ws = TRUE)
 
@@ -33,73 +27,121 @@ item <- xts(cleanitem$`Total volume`, order.by=as.Date(cleanitem$`Date`, "%m/%d/
 #Converting the data to a time series
 c.item <- ts(cleanitem, frequency=365, start=c(2016, 268)) 
 
-```
-
-```{r Description, echo=FALSE}
-# View the start and end dates of the dataset
-#start(c.item)
-#end(c.item)
-#frequency(c.item)
-cycle(c.item) # includes start, end and cycle
 
 ```
+## Summary of the Dataset :
+
+####This is the sales history for a single UPC for a non-perishable product sold in a single retail location. I chose this dataset as it is based on a relevant real world product to my company and I started working on the project before it was recommended we use data from the astsa package.
+
+####Here are the start, end, frequency and standard deviation:
+
+Start Year and Day: `r start(c.item)`
+
+End Year and Day:  `r end(c.item)`
+
+Frequency: `r frequency(c.item)`
+
+Standard Deviation: `r sd(c.item)`
+
+
 ## Exploration
 
-Exploring the dataset (plotting data: scatterplot, histogram):
-```{r FreqDuration, echo=FALSE}
-plot(item)
-hist(item)
+####Exploration of the dataset will take place with a trend and a histogram.  Since there is only one variable there is no need to do scatterplot.
 
+```{r plot, echo=FALSE}
+plot(item)
 ```
 
-## Decomposition
-Decomposition stage (plotting)
+####The plot over time doesn't show a clear linear increase or decrease. There is variability that happens each week with some days that have zero sales (Major holidays or out of stocks).
 
+
+```{r hist, echo=FALSE}
+hist(item)
+```
+
+####The histogram reveals a mostly normal distribution though we can see the zero and very low volume days on the left hand most bar.  These are valid data points and should be left in.
+
+
+## Decomposition
+####Decomposition stage (plotting)
 
 ```{r, Decompose, echo=FALSE}
-c.itemdecomp <- decompose(c.item, "additive")
+c.itemdecomp <- decompose(c.item, type =c("additive"),filter = NULL)
 plot(c.itemdecomp)
 ```
 
-## Regression
-building model, evaluation and interpretation
+####I chose additive because the seasonal and irregular components to not change despite the changes in the trend level.
 
-```{r, Regression, echo=FALSE}
+####The decomposition function was didn't work quite the same as it did on the astsa package.  I spent some time troubleshooting reviewing my dataset multiple times.  There is a value for every day and, though there are days with zero sales, these are real occurrences so they should be included.  Decompose may not be the best function for this data set.
+
+## Regression
+####Building the model, evaluation and interpretation
+####The first step in the regression was to take the difference using the "diff" function to remove any trending and reexamine the ACF and PACF.
+```{r, Regression, echo=FALSE, warning=FALSE}
 
 #removed the trend
 d_item=diff(item)
-acf2(d_item)
-plot(d_item)
+acf(d_item, lag.max = 35, plot = TRUE, na.action = na.contiguous, demean = TRUE)
+pacf(d_item, lag.max = 35, plot = TRUE, na.action = na.contiguous, demean = TRUE)
+#plot(d_item)
+```
 
+####As we can see from the ACF graph both the ACF and PACF trail off which indicate a ARMA model where p = 1, and q = 1.  With experimentation d was set equal to 1 as well.  1 In addition, when we look at the ACF we see that every seven days there is a spike indicating weekly seasonality.  This makes sense because sales spikes are commonplace on Saturdays.
 
+####Next step is to remove the 7 day cyclical nature with diff(d_item,lag=7) and plot the ACF and PACF again.
+
+``` {r, Regression2, echo=FALSE, warning=FALSE}
 #removing the cyclical nature of the data
 dd_item=diff(d_item,lag=7)
-plot(dd_item)
 
 #Plot the ACF and PACF
-acf2(dd_item, max.lag=60)
-
-AR = arima(item, order = c(1,1,1)) # I tried this with the seasonal 7 digit to no avail
-print(AR)
+acf(dd_item, lag.max = 60, plot = TRUE, na.action = na.contiguous, demean = TRUE)
+pacf(dd_item, lag.max = 60, plot = TRUE, na.action = na.contiguous, demean = TRUE)
 
 ```
-## Seasonal ARIMA
-Building ARMA model (SARIMA) with a forecast
+
+
+####When the 7 day lag is controlled the ACF and PACF can be reviewed on each seasonal marker (each 7 days).  When completed we see an ACF of 1 and PACF trailing off which represents a SMA(1) with a P = 0 and Q = 1.  After experimentation D was set equal to 1 as well.
+
+#### Based on those parameters here is the fit of the regression.
 
 ```{r, SARIMA model, echo=FALSE}
 #Model a Seasonal ARIMA
-x=sarima(item,1,1,1,0,1,1,7)
-x
-
-#Forecast the seasonal ARIMA
-sarima.for(item,35,1,1,1,0,1,1,7)
-
-```
-## Model Diagnostics
-
-ar1, ma1 and smal all have significant values
-```{r, Model Diagnostics, echo = FALSE}
-
+x=sarima(item,1,1,1,0,1,1,7,details=FALSE)
 x$ttable
 
 ```
+
+#### Since the P Values for ar1, ma1 and smal are less than .01 we can be 99% confident that they are significant and contributing to the model's performance.  There are additional model diagnostics below.
+
+
+## Model Diagnostics
+
+####Next we'll review more of Diagnostics to ensure a proper fit of the model. All of the diagnostics are printed below with a summary of the key pieces below. 
+
+
+```{r, Model Diagnostics, echo = TRUE}
+
+sarima(item,1,1,1,0,1,1,7)
+
+```
+
+####First review the Graphs of the Residual Analysis
+##### Standardized residuals - There were no obvious patterns in the residuals which is positive
+##### Sample ACF of Residuals - With the "wideness"" of the data, 95% of the data points between the two lines
+##### Normal Q-Q plot - In the normality assessment extreme values there are no major departures from the line so the normal assumption here is reasonable
+##### Q-statistic P Values - With another wideness assessment the points are above the line so an assumption can be made that the noise is white.  
+
+#### The AIC and BIC values are also relatively small.  To ensure the best fit over a dozen other models were run but all had higher AIC and BIC values indicating that the model derived from the ACF and PACF was sound.
+
+## Model Forecast
+#### Since the model represents the underlying dataset well, we can then use sarima.for against the same model to forecast sales.
+```{r, Forecast, echo = FALSE}
+#Forecast the seasonal ARIMA
+sarima.for(item,35,1,1,1,0,1,1,7)
+```
+#### Here we see the next 35 periods beyond the known actual sales. The daily seasonality of the data is included in the forecast.
+
+#### This concludes the summary, exploratory, decomposition, regression, modeling, diagnostics and forecasting of the product information for the final project.
+
+##Thanks for instructing the Time Series class!
