@@ -6,6 +6,8 @@ output: html_document
 ---
 
 
+
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
@@ -14,11 +16,15 @@ knitr::opts_chunk$set(echo = TRUE)
 library(readr)
 library(xts)
 library(astsa)
-library(readr)
+library(quantmod)
 
-cleanitem <- read_delim("C:/1 Brad/Dropbox/Data Science/Time Series Analysis/cleanitem.txt", 
-                        "\t", escape_double = FALSE, col_types = cols(Date = col_date(format = "%m/%d/%Y")), 
-                        trim_ws = TRUE)
+cleanitem <- read_delim("C:/1 Brad/Dropbox/Data Science/Time Series Analysis/cleanitem.txt",                         "\t", escape_double = FALSE, col_types = cols(Date = col_date(format = "%m/%d/%Y")), trim_ws = TRUE)
+
+# second dataset was a late add due to the additional grading criteria on submission page.  If known upfront this could easily be a single dataset
+cleanitem2 <- read_delim("C:/1 Brad/Dropbox/Data Science/Time Series Analysis/cleanitem2.txt", 
+                         "\t", escape_double = FALSE, col_types = cols(Date = col_date(format = "%m/%d/%Y"), 
+                          Month = col_integer(), YearQTR = col_integer()), trim_ws = TRUE)
+
 
 include=TRUE
 #Converting the data to an xts
@@ -31,7 +37,7 @@ c.item <- ts(cleanitem, frequency=365, start=c(2016, 268))
 ```
 ## Summary of the Dataset :
 
-####This is the sales history for a single UPC for a non-perishable product sold in a single retail location. I chose this dataset as it is based on a relevant real world product to my company and I started working on the project before it was recommended we use data from the astsa package.
+####This is the sales history for a single UPC for a non-perishable product sold in a single retail location.  The data was captured by a retailer when shoppers purchased the product. I chose this dataset as it is based on a relevant real world product to my company and I started working on the project before it was recommended we use data from the astsa package.
 
 ####Here are the start, end, frequency and standard deviation:
 
@@ -39,17 +45,18 @@ Start Year and Day: `r start(c.item)`
 
 End Year and Day:  `r end(c.item)`
 
-Frequency: `r frequency(c.item)`
+Frequency (days in a year since daily): `r frequency(c.item)`
 
-Standard Deviation: `r sd(c.item)`
+Standard Deviation of the sales amount: `r sd(c.item)`
 
 
 ## Exploration
 
-####Exploration of the dataset will take place with a trend and a histogram.  Since there is only one variable there is no need to do scatterplot.
+####Exploration of the dataset will take place with a trend, histogram and boxplots.  Since there is only one variable there is no need to do scatterplot.
 
-```{r plot, echo=FALSE}
+```{r plot, echo=FALSE, warning=FALSE}
 plot(item)
+abline( lm((item) ~ index(item) ), col="light blue", lwd=3 )  
 ```
 
 ####The plot over time doesn't show a clear linear increase or decrease. There is variability that happens each week with some days that have zero sales (Major holidays or out of stocks).
@@ -61,6 +68,18 @@ hist(item)
 
 ####The histogram reveals a mostly normal distribution though we can see the zero and very low volume days on the left hand most bar.  These are valid data points and should be left in.
 
+```{r Boxplot, echo=FALSE}
+
+attach(cleanitem2)
+par(mfrow=c(2,2))
+boxplot(cleanitem2$`Total volume` ~ cleanitem2$'Month', main="Boxplot by Month")
+boxplot(cleanitem2$`Total volume` ~ cleanitem2$'Year', main="Boxplot by Year")
+boxplot(cleanitem2$`Total volume` ~ cleanitem2$'Quarter', main="Boxplot by Season")
+boxplot(cleanitem2$`Total volume` ~ cleanitem2$'YearQTR', main="Boxplot by Year and Quarter")
+
+```
+
+####The set of boxplots show some of the potential differences by month, quarter and year.  The inner quartile range of the boxes overlaps on many of the comparisons.  While we do see more variation in some time periods with some YearQtr and month combinations selling more than others. 
 
 ## Decomposition
 ####Decomposition stage (plotting)
@@ -72,21 +91,23 @@ plot(c.itemdecomp)
 
 ####I chose additive because the seasonal and irregular components to not change despite the changes in the trend level.
 
-####The decomposition function was didn't work quite the same as it did on the astsa package.  I spent some time troubleshooting reviewing my dataset multiple times.  There is a value for every day and, though there are days with zero sales, these are real occurrences so they should be included.  Decompose may not be the best function for this data set.
+####The decomposition function was didn't work quite the same as it did on the astsa package.  I spent some time troubleshooting reviewing my dataset multiple times.  There is a value for every day and, though there are days with zero sales, these are real occurrences so they should be included.  Decompose may not be the best function for this data set.  As such, the box plots above go a level deeper within each time period.
 
-## Regression
+## Regression and Transformation
 ####Building the model, evaluation and interpretation
-####The first step in the regression was to take the difference using the "diff" function to remove any trending and reexamine the ACF and PACF.
-```{r, Regression, echo=FALSE, warning=FALSE}
+####The first step in the regression was to take the difference using the "diff" function to remove any trending and reexamine the ACF and PACF. Note: since the data didn't scale up or down there was no need for the log (tested but didn't yeild better results)
 
+```{r, Regression, echo=FALSE, warning=FALSE}
 #removed the trend
 d_item=diff(item)
 acf(d_item, lag.max = 35, plot = TRUE, na.action = na.contiguous, demean = TRUE)
 pacf(d_item, lag.max = 35, plot = TRUE, na.action = na.contiguous, demean = TRUE)
-#plot(d_item)
+plot(d_item)
 ```
 
-####As we can see from the ACF graph both the ACF and PACF trail off which indicate a ARMA model where p = 1, and q = 1.  With experimentation d was set equal to 1 as well.  1 In addition, when we look at the ACF we see that every seven days there is a spike indicating weekly seasonality.  This makes sense because sales spikes are commonplace on Saturdays.
+####As we can see from the ACF graph both the ACF and PACF trail off which indicate a ARMA model where p = 1, and q = 1.  Also,  the time series of the differenced data exhibits some ARIMA behavior so "d"" was set equal to 1 as well.  In testing multiple values 1 was the most effective.
+
+####In addition, when we look at the ACF we see that every seven days there is a spike indicating weekly seasonality.  This makes sense because sales spikes are commonplace on Saturdays.
 
 ####Next step is to remove the 7 day cyclical nature with diff(d_item,lag=7) and plot the ACF and PACF again.
 
